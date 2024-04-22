@@ -14,7 +14,7 @@ import pytest
 SO = f"./tests/dt.{gf.lib_ext()}"
 MOD = "./tests/dt.mod"
 
-x = gf.fFort(SO, MOD)
+# x = gf.fFort(SO, MOD)
 
 
 # @pytest.mark.skip
@@ -180,6 +180,15 @@ class TestDTMethods:
         self.assertEqual(y.result["a_int"], 123)
         self.assertEqual(y.result["f_nested"]["a_int"], 234)
         self.assertEqual(y.result["f_nested"]["f_struct"]["a_int"], 345)
+    
+    def test_func_return_allocatable_s_struct_nested_2(self):
+        y = x.func_return_allocatable_s_struct_nested_2()
+        self.assertEqual(y.result[0]["a_int"], 123)
+        self.assertEqual(y.result[0]["f_nested"]["a_int"], 234)
+        self.assertEqual(y.result[0]["f_nested"]["f_struct"]["a_int"], 345)
+        self.assertEqual(y.result[1]["a_int"], 456)
+        self.assertEqual(y.result[1]["f_nested"]["a_int"], 567)
+        self.assertEqual(y.result[1]["f_nested"]["f_struct"]["a_int"], 678)
 
     def test_derived_type_intent_out(self, capfd):
         # GH: #32
@@ -189,3 +198,11 @@ class TestDTMethods:
         self.assertEqual(out.strip(), "10 20 30 40")
 
         assert np.all(y.args["p"]["iq"] == np.array([10, 20, 30, 40]))
+
+a = TestDTMethods()
+
+os.system(f"gfortran -fPIC -shared -c dt.f90")
+os.system(f"gfortran -fPIC -shared -o dt.so dt.f90")
+x = gf.fFort("dt.so", "dt.mod")
+
+a.test_func_return_allocatable_s_struct_nested_2()

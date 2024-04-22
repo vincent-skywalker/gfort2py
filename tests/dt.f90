@@ -289,6 +289,17 @@ module dt
         s%f_nested%f_struct%a_int = 345
     end function func_return_s_struct_nested_2
 
+    function func_return_allocatable_s_struct_nested_2() result(s)
+        type(s_struct_nested_2),allocatable::s(:)
+        allocate(s(2))
+        s(1)%a_int = 123
+        s(1)%f_nested%a_int = 234
+        s(1)%f_nested%f_struct%a_int = 345
+        s(2)%a_int = 456
+        s(2)%f_nested%a_int = 567
+        s(2)%f_nested%f_struct%a_int = 678
+    end function func_return_allocatable_s_struct_nested_2
+
 
     subroutine derived_structure(p)
         ! GH: #32

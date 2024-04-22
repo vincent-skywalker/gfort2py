@@ -2,6 +2,7 @@
 import ctypes
 import numpy as np
 
+from .fArrays import fAssumedShape
 from .fVar_t import fVar_t
 
 from .utils import copy_array
@@ -249,3 +250,8 @@ class fExplicitDT(fVar_t):
     @value.setter
     def value(self, value):
         self.from_param(value)
+
+
+class fAssumedShapeDT(fAssumedShape):
+    def __init__(self, obj, fvar, allobjs=None, cvalue=None):
+        super().__init__(obj, fvar, allobjs=allobjs, cvalue=cvalue)

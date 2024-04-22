@@ -7,7 +7,7 @@ from .fVar_t import fVar_t
 from .fScalars import fScalar, fCmplx
 from .fArrays import fExplicitArr, fAssumedShape, fAssumedSize
 from .fStrings import fStr, fAllocStr, fStrExplicit, fStrAssumedShape
-from .fDT import fDT, fExplicitDT
+from .fDT import fDT, fExplicitDT, fAssumedShapeDT
 from .fProcPtr import fProcPointer
 
 
@@ -25,6 +25,8 @@ class fVar:
             if obj.is_array():
                 if obj.is_explicit():
                     return fExplicitDT(obj, fVar, *args, **kwargs)
+                elif obj.is_allocatable():
+                    return fAssumedShapeDT(obj, fVar, *args, **kwargs)
                 raise NotImplementedError
             else:
                 return fDT(obj, fVar, *args, **kwargs)
