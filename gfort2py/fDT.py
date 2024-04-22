@@ -251,7 +251,147 @@ class fExplicitDT(fVar_t):
     def value(self, value):
         self.from_param(value)
 
+from .utils import is_64bit
 
-class fAssumedShapeDT(fAssumedShape):
-    def __init__(self, obj, fvar, allobjs=None, cvalue=None):
-        super().__init__(obj, fvar, allobjs=allobjs, cvalue=cvalue)
+if is_64bit():
+    _index_t = ctypes.c_int64
+    _size_t = ctypes.c_int64
+else:
+    _index_t = ctypes.c_int32
+    _size_t = ctypes.c_int32
+
+class _bounds14(ctypes.Structure):
+    _fields_ = [("stride", _index_t), ("lbound", _index_t), ("ubound", _index_t)]
+
+def _make_fAlloc15(_dtype_type, ndims):
+    class _fAllocArray(ctypes.Structure):
+        _fields_ = [
+            ("base_addr", ctypes.c_void_p),
+            ("offset", _size_t),
+            ("dtype", _dtype_type),
+            ("span", _index_t),
+            ("dims", _bounds14 * ndims),
+        ]
+
+    return _fAllocArray
+
+
+class fAssumedShapeDT(fExplicitDT):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+    
+    def ctype(self):
+        self._ctype = _make_fAlloc15(self._dt_ctype.ctype(), self.obj.ndim)
+        return self._ctype
+
+    def __getitem__(self, index):
+        if self.cvalue is None:
+            self.cvalue = self.ctype()()
+
+        if isinstance(index, tuple):
+            ind = np.ravel_multi_index(index, self.obj.shape(), order="F")
+        else:
+            ind = index
+
+        if ind > self.obj.size:
+            raise IndexError("Out of bounds")
+
+        if ind not in self._saved:
+            self._saved[ind] = fDT(
+                self.obj, self.fvar, allobjs=self.allobjs, cvalue=self.cvalue[ind]
+            )
+
+        return self._saved[ind]
+
+    def __setitem__(self, index, value):
+        if self.cvalue is None:
+            self.cvalue = self.ctype()()
+
+        if isinstance(index, tuple):
+            ind = np.ravel_multi_index(index, self.obj.shape(), order="F")
+        else:
+            ind = index
+
+        if ind > self.obj.size:
+            raise IndexError("Out of bounds")
+
+        if ind not in self._saved:
+            self._saved[ind] = fDT(
+                self.obj, allobjs=self.allobjs, cvalue=self.cvalue[ind]
+            )
+
+        self._saved[ind].value = value
+    
+    def _array_check(self, value, know_shape=True):
+        value = value.astype(self._dt_ctype.ctype())
+        shape = self.obj.shape()
+        ndim = self.obj.ndim
+
+        print(type(value), value.ndim, ndim)
+        if value.ndim != ndim:
+            raise ValueError(
+                f"Wrong number of dimensions, got {value.ndim} expected {ndim}"
+            )
+
+        if know_shape:
+            if not self.obj.is_allocatable and list(value.shape) != shape:
+                raise ValueError(f"Wrong shape, got {value.shape} expected {shape}")
+
+        value = value.ravel(order="F")
+        return value
+
+    def from_param(self, value):
+        if self.cvalue is None:
+            self.cvalue = self.ctype()()
+
+        if value is not None:
+            self._value = self._array_check(value, False)
+
+            # copy_array(
+            #     self._value.ctypes.data,
+            #     self.cvalue.base_addr,
+            #     ctypes.sizeof(self._ctype_base()),
+            #     np.size(value)
+            # )
+            self.cvalue.base_addr = self._value.ctypes.data
+
+            self.cvalue.span = ctypes.sizeof(self._ctype_base())
+
+            strides = []
+            shape = np.shape(value)
+            for i in range(self.ndim):
+                self.cvalue.dims[i].lbound = _index_t(1)
+                self.cvalue.dims[i].ubound = _index_t(shape[i])
+                strides.append(
+                    self.cvalue.dims[i].ubound - self.cvalue.dims[i].lbound + 1
+                )
+
+            spans = []
+            for i in range(self.ndim):
+                spans.append(int(np.prod(strides[:i])))
+                self.cvalue.dims[i].stride = _index_t(spans[-1])
+
+            self.cvalue.offset = -np.sum(spans)
+
+        self.cvalue.dtype.elem_len = self.cvalue.span
+        self.cvalue.dtype.version = 0
+        self.cvalue.dtype.rank = self.ndim
+        self.cvalue.dtype.type = self.ftype()
+        self.cvalue.dtype.attribute = 0
+
+        return self.cvalue
+
+    @property
+    def value(self):
+        return self
+
+    @value.setter
+    def value(self, value):
+        self.from_param(value)
+    
+    def _make_empty(self, shape=None):
+        dtype = self._dt_ctype.ctype()
+        if shape is None:
+            shape = self.obj.shape()
+
+        return np.zeros(shape, dtype=dtype, order="F")
