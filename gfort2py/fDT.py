@@ -323,11 +323,10 @@ class fAssumedShapeDT(fExplicitDT):
         self._saved[ind].value = value
     
     def _array_check(self, value, know_shape=True):
-        value = value.astype(self._dt_ctype.ctype())
+        # value = value.astype(self._dt_ctype.ctype())
         shape = self.obj.shape()
         ndim = self.obj.ndim
 
-        print(type(value), value.ndim, ndim)
         if value.ndim != ndim:
             raise ValueError(
                 f"Wrong number of dimensions, got {value.ndim} expected {ndim}"
@@ -337,7 +336,7 @@ class fAssumedShapeDT(fExplicitDT):
             if not self.obj.is_allocatable and list(value.shape) != shape:
                 raise ValueError(f"Wrong shape, got {value.shape} expected {shape}")
 
-        value = value.ravel(order="F")
+        # value = value.ravel(order="F")
         return value
 
     def from_param(self, value):
@@ -353,9 +352,10 @@ class fAssumedShapeDT(fExplicitDT):
             #     ctypes.sizeof(self._ctype_base()),
             #     np.size(value)
             # )
+            print(type(self._value))
             self.cvalue.base_addr = self._value.ctypes.data
 
-            self.cvalue.span = ctypes.sizeof(self._ctype_base())
+            self.cvalue.span = ctypes.sizeof(self._dt_ctype.ctype())
 
             strides = []
             shape = np.shape(value)
@@ -376,7 +376,7 @@ class fAssumedShapeDT(fExplicitDT):
         self.cvalue.dtype.elem_len = self.cvalue.span
         self.cvalue.dtype.version = 0
         self.cvalue.dtype.rank = self.ndim
-        self.cvalue.dtype.type = self.ftype()
+        self.cvalue.dtype.type = 0
         self.cvalue.dtype.attribute = 0
 
         return self.cvalue
@@ -389,9 +389,17 @@ class fAssumedShapeDT(fExplicitDT):
     def value(self, value):
         self.from_param(value)
     
+    @property
+    def ndim(self):
+        return self.obj.ndim
+    
     def _make_empty(self, shape=None):
         dtype = self._dt_ctype.ctype()
         if shape is None:
             shape = self.obj.shape()
 
         return np.zeros(shape, dtype=dtype, order="F")
+
+class fAssumedSizeDT(fAssumedShapeDT):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)

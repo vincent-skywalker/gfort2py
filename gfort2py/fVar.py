@@ -7,7 +7,7 @@ from .fVar_t import fVar_t
 from .fScalars import fScalar, fCmplx
 from .fArrays import fExplicitArr, fAssumedShape, fAssumedSize
 from .fStrings import fStr, fAllocStr, fStrExplicit, fStrAssumedShape
-from .fDT import fDT, fExplicitDT, fAssumedShapeDT
+from .fDT import fDT, fExplicitDT, fAssumedShapeDT, fAssumedSizeDT
 from .fProcPtr import fProcPointer
 
 
@@ -25,9 +25,17 @@ class fVar:
             if obj.is_array():
                 if obj.is_explicit():
                     return fExplicitDT(obj, fVar, *args, **kwargs)
-                elif obj.is_allocatable():
+                elif obj.is_assumed_size():
+                    return fAssumedSizeDT(obj, fVar, *args, **kwargs)
+                elif (
+                    obj.is_assumed_shape()
+                    or obj.is_allocatable()
+                    or obj.is_pointer()
+                    or obj.is_always_explicit()
+                ):
                     return fAssumedShapeDT(obj, fVar, *args, **kwargs)
-                raise NotImplementedError
+                else:
+                    raise TypeError("Unknown array type of derived type")
             else:
                 return fDT(obj, fVar, *args, **kwargs)
         elif obj.is_proc_pointer():
